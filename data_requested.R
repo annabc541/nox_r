@@ -82,7 +82,7 @@ raw_dat_june = bind_rows(datList) %>%
   remove_constant()
 
 #joining parameters and processed data
-temp_no2_dat = left_join(no2_dat,raw_dat_june)
+temp_no2_dat = left_join(no2_dat,raw_dat_june,by = "date")
 
 temp_no2_dat %>% 
   filter(date > "2023-06-14" & date < "2023-06-14 06:00") %>%
