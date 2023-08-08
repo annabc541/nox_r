@@ -38,15 +38,15 @@ processed_dat_unfiltered = read.csv("NOx_2023_calc_df.csv") %>%
 #reading in raw data -> parameters for that period
 setwd('D:/Cape Verde/data/nox_raw_data')
 
-files = list.files(pattern = "z_23", full.names=TRUE)
+files = list.files(pattern = "z_2308", full.names=TRUE)
 datList = list()
 for(index in 1:length(files)) {
-  
+
   datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
     mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
     rename(date = TheTime) %>%
     tibble()
-  
+
 }
 
 raw_dat = bind_rows(datList) %>%
@@ -57,7 +57,11 @@ raw_dat = bind_rows(datList) %>%
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 #save raw data up until 07/08 in one df, averaged and filtered as above
-write.csv(raw_dat,"output/raw_dat23.csv",row.names = FALSE)
+# write.csv(raw_dat,"output/raw_dat23.csv",row.names = FALSE)
+
+dat = read.csv("output/raw_dat23.csv") %>% 
+  tibble() %>% 
+  mutate(date = ymd_hms(date))
 
 
 # Rename and rearrange dfs ------------------------------------------------
