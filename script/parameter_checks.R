@@ -6,7 +6,7 @@ library(janitor)
 Sys.setenv(TZ = 'UTC')
 
 
-# Reading in data ---------------------------------------------------------
+# Checking processing code with PMT temperature filtered and not ----------
 
 #reading in processed data (filtered to remove when pmt temp is above -27 degrees)
 setwd("~/Cape Verde/nox/processing/data/pmt_27")
@@ -24,44 +24,24 @@ processed_dat = read.csv("NOx_2023_calc_df.csv") %>%
 #reading in processed data (with no filtering for pmt temp)
 setwd("~/Cape Verde/nox/processing/data/no_pmt_filter")
 
-processed_dat_unfiltered = read.csv("NOx_2023_calc_df.csv") %>% 
+processed_dat = read.csv("NOx_2023_calc_df.csv") %>% 
   tibble() %>% 
   rename(date = X) %>% 
-  mutate(date = ymd_hms(date),
-         date = round_date(date, "1 sec")) %>% 
+  mutate(date = ymd_hms(date)) %>% 
   remove_empty() %>% 
   remove_constant() %>%
   arrange(date) %>% 
   timeAverage("5 min")
 # filter(date > "2023-06-01")
 
-#reading in raw data -> parameters for that period
-setwd('D:/Cape Verde/data/nox_raw_data')
-
-files = list.files(pattern = "z_2308", full.names=TRUE)
-datList = list()
-for(index in 1:length(files)) {
-
-  datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
-    mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
-    rename(date = TheTime) %>%
-    tibble()
-
-}
-
-raw_dat = bind_rows(datList) %>%
-  mutate(date = round_date(date, "1 sec")) %>%
-  timeAverage("5 min") %>%
-  remove_empty() %>%
-  remove_constant()
-
+#raw data with parameters - updated until 8th August, update as necessary
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
-#save raw data up until 07/08 in one df, averaged and filtered as above
-# write.csv(raw_dat,"output/raw_dat23.csv",row.names = FALSE)
 
-dat = read.csv("output/raw_dat23.csv") %>% 
+dat23 = read.csv("output/raw_dat23.csv") %>% 
   tibble() %>% 
-  mutate(date = ymd_hms(date))
+  mutate(date = ymd_hms(date)) %>% 
+  timeAverage("5 min") %>% 
+  filter(date < "2023-08-01 16:28")
 
 
 # Rename and rearrange dfs ------------------------------------------------
