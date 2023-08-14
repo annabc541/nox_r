@@ -30,11 +30,13 @@ raw_dat2308 = bind_rows(datList) %>%
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-dat23 = read.csv("output/raw_dat23.csv") %>% 
+raw_dat23 = read.csv("output/raw_dat23.csv") %>% 
   tibble() %>% 
   mutate(date = ymd_hms(date)) %>% 
   timeAverage("5 min") %>% 
-  filter(date < "2023-08-01 16:28")
+  filter(date < "2023-08-01 16:25")
+
+dat23 = bind_rows(raw_dat23,raw_dat2308)
 
 dat22 = read.csv("output/summer22.csv") %>% 
   tibble() %>% 
@@ -44,7 +46,7 @@ dat21 = read.csv("output/summer21.csv") %>%
   tibble() %>% 
   mutate(date = ymd_hms(date))
 
-dat = bind_rows(dat21,dat22,dat23,raw_dat2308) %>% 
+dat = bind_rows(dat21,dat22,dat23) %>% 
   timeAverage("1 hour") %>% 
   arrange(date)
 
@@ -64,12 +66,13 @@ dat %>%
                                    date > "2023-06-15" & date < "2023-08-08" ~ "PMT -28, lab 22",
                                    date > "2023-08-07" ~ "PMT -24,lab 22")) %>% 
   filter(month >= 6 & month <= 8,
-         Rxn_Vessel_Pressure < 0.5) %>%
+         PMT_Temp > -40,
+         Rxn_Cell_Temp > 35.3) %>%
   # filter(year == 2023) %>% 
-  # pivot_longer(c(PMT_Temp,Control_Temp)) %>%
-  ggplot(aes(date,Rxn_Vessel_Pressure,col = Control_Temp)) +
+  # pivot_longer(c(PMT_Temp,Control_Temp,Rxn_Cell_Temp)) %>%
+  ggplot(aes(Control_Temp,Rxn_Cell_Temp,col = year)) +
   geom_point() +
-  facet_wrap(~year,scales = "free",ncol = 1) +
+  # facet_wrap(~year,ncol = 1) +
   # labs(y = "Degrees Celsius") +
   # facet_grid(rows = vars(name),cols = vars(year),scales = "free") +
   # geom_vline(xintercept = as.numeric(as.POSIXct("2023-06-16")),
@@ -80,7 +83,7 @@ dat %>%
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-ggsave('temp_summer_21to23.png',
+ggsave('lab_reaction_vol_pmt_temp.png',
        path = "output/plots/temp_different_years",
        width = 30,
        height = 12,
@@ -96,16 +99,12 @@ dat23 = bind_rows(dat23,raw_dat2308)
 
 #looking at 2023 5 min averaged
 dat23 %>% 
-  filter(date > "2023-06-01",
+  filter(date > "2023-02-14",
          NOx_cal == 0,
-         CH1_Hz > 0) %>% 
-  pivot_longer(c(CH1_Hz,Control_Temp,PMT_Temp)) %>% 
-  # mutate(doy = yday(date)) %>% 
-  # filter(PMT_Temp > -50 & PMT_Temp < -20,
-  #        CH1_zero > 1000,
-  #        date > "2023-02-14") %>% 
-  ggplot(aes(date,value)) +
-  facet_grid(rows = vars(name),scales = "free_y") +
+         CH1_zero > 0 & CH1_zero < 6000) %>% 
+  mutate(month = month(date)) %>%
+  ggplot(aes(Rxn_Cell_Temp,CH1_zero,col = PMT_Temp)) +
+  # facet_grid(rows = vars(name),scales = "free_y") +
   geom_point() +
   scale_colour_viridis_c()
 
@@ -116,7 +115,7 @@ raw_dat2108 %>%
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-ggsave('lab_pmt_raw_summer23.png',
+ggsave('lab_pmt_raw_summer23_rxn_col.png',
        path = "output/plots/2023",
        width = 30,
        height = 12,
