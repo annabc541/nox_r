@@ -120,3 +120,16 @@ ggsave("summer_temp.svg",
        width = 30,
        height = 12,
        units = 'cm')
+
+# Lab temp 2021 and 2022 for katie ----------------------------------------
+
+dat21 = read.csv("hourly_year/raw_dat21.csv") %>% 
+  mutate(date = ymd_hms(date)) %>% 
+  select(date,lab_temp = Control_Temp,pmt_temp = PMT_Temp)
+
+dat22 = read.csv("hourly_year/raw_dat22.csv") %>% 
+  mutate(date = ymd_hms(date)) %>% 
+  select(date,lab_temp = Control_Temp,pmt_temp = PMT_Temp)
+ 
+write.csv(dat21,"~/Cape Verde/nox/processing/initial_processing/nox_r/output/data/temp21.csv",row.names = F)
+write.csv(dat22,"~/Cape Verde/nox/processing/initial_processing/nox_r/output/data/temp22.csv",row.names = F)
