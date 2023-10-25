@@ -10,7 +10,7 @@ Sys.setenv(TZ = 'UTC')
 
 # Read in processed data ------------------------------------------------------------
 
-setwd("~/Cape Verde/nox/processing/data/processed_data_sep23")
+setwd("~/Cape Verde/nox/processing/data/processed_data_oct23")
 
 processed_dat = read.csv("NOx_2023_calc_df.csv") %>% 
   tibble() %>% 
@@ -27,7 +27,7 @@ processed_dat = read.csv("NOx_2023_calc_df.csv") %>%
 #updating 2023 raw data
 setwd('D:/Cape Verde/data/nox_raw_data')
 
-files = list.files(pattern = "z_2309", full.names=TRUE)
+files = list.files(pattern = "z_2310", full.names=TRUE)
 datList = list()
 for(index in 1:length(files)) {
   
@@ -39,7 +39,7 @@ for(index in 1:length(files)) {
   
 }
 
-raw_dat2309 = bind_rows(datList) %>%
+raw_dat2310 = bind_rows(datList) %>%
   # mutate(date = round_date(date, "1 sec")) %>%
   remove_empty() %>%
   remove_constant() 
@@ -47,32 +47,53 @@ raw_dat2309 = bind_rows(datList) %>%
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-initial_raw_dat23 = read.csv("output/raw_dat23.csv") %>% 
+initial_raw_dat23 = read.csv("output/data/raw_dat23.csv") %>% 
   tibble() %>% 
   mutate(date = ymd_hms(date)) %>% 
   timeAverage("5 min")
 
-raw_dat23 = bind_rows(initial_raw_dat23,raw_dat2309) %>% 
+raw_dat23 = bind_rows(initial_raw_dat23,raw_dat2310) %>% 
   select(-c(NO_Conc,NO2_CE,NO2_CE_diodes,NO2_conc_diodes)) %>% 
   remove_constant() %>% 
   remove_empty()
 
+# write.csv(raw_dat,"output/data/raw_dat23.csv",row.names =  FALSE)
+
 all_dat = left_join(processed_dat,raw_dat23,by = "date")
 
-write.csv(all_dat23_pmt,"output/processed_and_raw_data.csv",row.names =  FALSE)
+# write.csv(all_dat23_pmt,"output/processed_and_raw_data.csv",row.names =  FALSE)
 
 # Checking noxy parameters after pump tip seals were changed --------------
 
+raw_dat23 %>%
+  # timeAverage("1 hour") %>%
+  filter(
+    date > "2023-09-19 22:00",
+         NOx_cal == 0,
+         CH1_Hz > 0,
+    CH1_zero > 0) %>%
+  pivot_longer(c(CH1_Hz,CH1_zero,PMT_Temp)) %>%
+  ggplot(aes(date,value,col = Control_Temp)) +
+  geom_point() +
+  scale_x_datetime(date_breaks = "1 day",date_labels = "%d/%m") +
+  facet_grid(rows = vars(name),scales = "free") +
+  scale_colour_viridis_c() +
+  NULL
+
 #removed data between 18/09/23 13:30 to 19/09/23 19:00 when pump fan wasn't working
 
+#spikes in zero measurements are associated with calibrations
 all_dat %>%
   # timeAverage("1 hour") %>% 
-  filter(Rxn_Vessel_Pressure < 3) %>%
-  # pivot_longer(c(NO_night_mean,Rxn_Vessel_Pressure)) %>% 
-  ggplot(aes(PAG_,Rxn_Vessel_Pressure)) +
+  filter(date > "2023-09-19 22:00",
+         NOx_cal == 0,
+         CH1_Hz > 0,
+         CH1_zero > 0) %>%
+  pivot_longer(c(CH1_zero,CH1_Hz,NO_Conc_art_corrected,NO2_Conc_diode,NO2_Conc_art_corrected)) %>%
+  ggplot(aes(date,value,col = PMT_Temp)) +
   geom_point() +
-  # scale_x_datetime(date_breaks = "2 weeks",date_labels = "%d/%m") +
-  # facet_grid(rows = vars(name),scales = "free") +
+  scale_x_datetime(date_breaks = "4 days",date_labels = "%d/%m") +
+  facet_grid(rows = vars(name),scales = "free") +
   scale_colour_viridis_c() +
   NULL
 
