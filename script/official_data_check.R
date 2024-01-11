@@ -73,10 +73,9 @@ met = read.csv("data/met.csv") %>%
   mutate(date = ymd_hms(date)) %>% 
   select(date,ws,wd,temp)
 
-nox_with_met = left_join(met,all_dat) 
+nox_with_met = left_join(all_dat,met) 
 
 # Plotting 2023 data ------------------------------------------------------
-
 
 nox_with_met %>%
   mutate(flag = case_when(ws < 2 ~ "ws flag",
@@ -87,10 +86,11 @@ nox_with_met %>%
                                   TRUE ~ 0),
          PMT_Temp = ifelse(remove_dates == 0, PMT_Temp,NA_real_),
          Rxn_Vessel_Pressure = ifelse(remove_dates == 0, Rxn_Vessel_Pressure,NA_real_),
-         NO_Conc_art_corrected = case_when(NO_Conc_art_corrected > 50 ~ NA_real_,
+         NO_Conc_art_corrected = case_when(NO_Conc_art_corrected > 10 ~ NA_real_,
                                            flag != "no flag" ~ NA_real_,
                                            TRUE ~ NO_Conc_art_corrected),
-         NO2_Conc_diode = case_when(NO2_Conc_diode > 100 ~ NA_real_,
+         NO2_Conc_diode = case_when(NO2_Conc_diode > 50 ~ NA_real_,
+                                    NO2_Conc_diode < -5 ~ NA_real_,
                                     flag != "no flag" ~ NA_real_,
                                     TRUE ~ NO2_Conc_diode),
          CH1_Hz = case_when(CH1_Hz < 0 ~ NA_real_,
@@ -107,17 +107,17 @@ nox_with_met %>%
                               PMT_Temp < -30 ~ NA_real_,
                               remove_dates != 0 ~ NA_real_,
                               TRUE ~ CH1_zero)) %>% 
-  # timeAverage("1 hour") %>%
-  filter(date > "2023-09-02") %>%
+  timeAverage("1 hour") %>%
+  filter(date > "2023-02-01") %>%
   rename(NO = NO_Conc_art_corrected,"NO[2]" = NO2_Conc_diode) %>%
-  pivot_longer(c(NO,"NO[2]",CH1_Hz,CH1_zero)) %>%
-  ggplot(aes(date,value,col = Control_Temp)) +
+  pivot_longer(c(NO,"NO[2]")) %>%
+  ggplot(aes(date,value)) +
   geom_path() +
   facet_grid(rows = vars(name),scales = "free_y",labeller = label_parsed) +
-  scale_x_datetime(date_breaks = "1 week",date_labels = "%d/%m/%y") +
+  scale_x_datetime(date_breaks = "1 month",date_labels = "%d/%m/%y") +
   scale_colour_viridis_c() +
   labs(x = "Datetime (UTC)",
-       y = NULL)
+       y = "Mixing ratios (ppt)")
 
 ggsave("nox_sep.png",
        path = "output/plots/nox_overview_plots_oct23",
@@ -125,6 +125,46 @@ ggsave("nox_sep.png",
        height = 12,
        units = 'cm')
 
+diurnal = nox_with_met %>% 
+  mutate(flag = case_when(ws < 2 ~ "ws flag",
+                          wd > 100 & wd < 340 ~ "wd flag",
+                          TRUE ~ "no flag"),
+         NO_Conc_art_corrected = case_when(flag != "no flag" ~ NA_real_,
+                                           TRUE ~ NO_Conc_art_corrected),
+         NO2_Conc_diode = case_when(flag != "no flag" ~ NA_real_,
+                                    TRUE ~ NO2_Conc_diode)) %>% 
+  rename(NO = NO_Conc_art_corrected,NO2 = NO2_Conc_diode) %>%
+  mutate(month = month(date),
+         nox = NO + NO2) %>% 
+  pivot_wider(names_from = month,values_from = nox) %>% 
+  timeVariation(pollutant = c("2":"10"))
+
+diurnal_dat = diurnal$data$hour
+
+diurnal_dat %>% 
+  mutate(variable = case_when(variable == 2 ~ "February",
+                              variable == 3 ~ "March",
+                              variable == 4 ~ "April",
+                              variable == 5 ~ "May",
+                              variable == 6 ~ "June",
+                              variable == 7 ~ "July",
+                              variable == 8 ~ "August",
+                              variable == 9 ~ "September",
+                              variable == 10 ~ "October")) %>% 
+  ggplot(aes(hour,Mean)) +
+  geom_line(size = 1) +
+  facet_wrap(~factor(variable,levels = c("February","March","April","May","June","July","August","September","October"))) +
+  theme_bw() +
+  labs(x = "Hour of day (UTC)",
+       y = expression(NO[x]~(ppt))) +
+  scale_x_continuous(breaks = c(0,4,8,12,16,20)) +
+  theme(legend.position = "top")
+
+ggsave("nox_monthly_diurnal_23.png",
+       path = "output/plots/nox_overview_plots_oct23",
+       width = 30,
+       height = 12,
+       units = 'cm')
 
 # Calibrations ------------------------------------------------------------
 
@@ -159,9 +199,7 @@ setwd("~/Cape Verde/nox/final_data")
 nox14_22 = read.csv("NOx_2014-2022.csv") %>% 
   tibble() %>%  
   mutate(date = ymd_hms(date),
-         date = round_date(date, "1 sec")) %>%
-  filter(date > "2018-01-01")
-
+         date = round_date(date, "1 sec"))
 nox23 = nox_with_met %>% 
   mutate(no_flag = case_when(ws < 2 ~ 1,
                              wd > 100 & wd < 340 ~ 2,
@@ -180,24 +218,27 @@ nox %>%
                             no_ppt > 50 ~ NA_real_,
                             TRUE ~ no_ppt),
          no2_diode_ppt = case_when(no2_diode_flag != 0 & no2_diode_flag != 0.147 ~ NA_real_,
-                            no2_diode_ppt > 50 ~ NA_real_,
+                            no2_diode_ppt > 200 ~ NA_real_,
                             TRUE ~ no2_diode_ppt)
   ) %>%
-  ggplot(aes(date,no_ppt)) +
+  rename(NO = no_ppt,
+         "NO[2]" = no2_diode_ppt) %>% 
+  pivot_longer(c(NO,"NO[2]")) %>% 
+  ggplot(aes(date,value)) +
   theme_bw() +
   geom_path() +
-  facet_wrap(ncol =1, vars(year),scales = "free") +
+  facet_grid(rows = vars(name),scales = "free",labeller = label_parsed)+
   labs(y = "Mixing ratio (ppt)",
        x = NULL,
        col = NULL) +
-  scale_x_datetime(date_breaks = "1 month", date_labels = "%b")
+  scale_x_datetime(date_breaks = "6 month", date_labels = "%b %Y")
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-ggsave("no_yearly_comparison.svg",
+ggsave("nox_full_dataset.svg",
        path = "output/plots/nox_overview_plots_oct23",
        width = 33.87,
-       height = 17,
+       height = 13,
        units = 'cm')
 
 no2_timevar_output = nox %>% 

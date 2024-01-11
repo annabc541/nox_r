@@ -5,90 +5,88 @@ library(janitor)
 
 Sys.setenv(TZ = 'UTC')
 
+#temperature readout from logger computer
+lab_met = read.csv("output/data/Met_30m_2023_hourly.csv") %>% 
+  mutate(date = ymd_hms(date)) %>% 
+  select(date,Temp,insidetemp)
 
-# Reading in simplified data ------------------------------------------------
+temp = raw_dat23 %>% 
+  timeAverage("1 hour") %>% 
+  select(date,Control_Temp,PMT_Temp) %>% 
+  left_join(lab_met,by = "date")
 
-#updating 2023 data
-setwd('D:/Cape Verde/data/nox_raw_data')
+temp %>% 
+  filter(date > "2023-09-01") %>% 
+  pivot_longer(c(Control_Temp,Temp,insidetemp)) %>% 
+  ggplot(aes(date,value,col = name)) +
+  geom_path()
 
-files = list.files(pattern = "z_2308", full.names=TRUE)
-datList = list()
-for(index in 1:length(files)) {
-  
-  datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
-    mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
-    rename(date = TheTime) %>%
-    tibble()
-  
-}
-
-raw_dat2308 = bind_rows(datList) %>%
-  mutate(date = round_date(date, "1 sec")) %>%
-  remove_empty() %>%
-  remove_constant() %>% 
-  timeAverage("5 min")
+# Reading in hourly raw data ------------------------------------------------
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-raw_dat23 = read.csv("output/raw_dat23.csv") %>% 
-  tibble() %>% 
-  mutate(date = ymd_hms(date)) %>% 
-  timeAverage("5 min") %>% 
-  filter(date < "2023-08-01 16:25")
-
-dat23 = bind_rows(raw_dat23,raw_dat2308)
-
-dat22 = read.csv("output/summer22.csv") %>% 
+raw_dat23 = read.csv("output/data/raw_dat23.csv") %>% 
   tibble() %>% 
   mutate(date = ymd_hms(date))
 
-dat21 = read.csv("output/summer21.csv") %>% 
+
+raw_dat22 = read.csv("output/data/raw_dat22.csv") %>% 
   tibble() %>% 
   mutate(date = ymd_hms(date))
 
-dat = bind_rows(dat21,dat22,dat23) %>% 
+setwd("D:/Cape Verde/data")
+
+raw_dat21 = read.csv("D:/Cape Verde/data/no_raw_hourly/raw_dat21.csv") %>% 
+  tibble() %>% 
+  mutate(date = ymd_hms(date))
+
+dat = bind_rows(raw_dat21,raw_dat22,raw_dat23) %>% 
   timeAverage("1 hour") %>% 
   arrange(date)
 
 
 # Plotting ----------------------------------------------------------------
 
-#looking at hourly averages for summer 2021, 2022, 2023
-#raw datasets of hourly summer months have been saved
+#comparing 2021, 2022 and 2023
 
 dat %>% 
-  mutate(year = year(date),
-         month = month(date),
-         hour = hour(date),
-         doy = yday(date),
-         temp_settings = case_when(date < "2023-06-09" ~ "PMT -30, lab 20",
-                                   date > "2023-06-09" & date < "2023-06-15" ~ "PMT -28, lab 20",
-                                   date > "2023-06-15" & date < "2023-08-08" ~ "PMT -28, lab 22",
-                                   date > "2023-08-07" ~ "PMT -24,lab 22")) %>% 
-  filter(month >= 6 & month <= 8,
-         PMT_Temp > -40,
-         Rxn_Cell_Temp > 35.3) %>%
-  # filter(year == 2023) %>% 
-  # pivot_longer(c(PMT_Temp,Control_Temp,Rxn_Cell_Temp)) %>%
-  ggplot(aes(Control_Temp,Rxn_Cell_Temp,col = year)) +
-  geom_point() +
-  # facet_wrap(~year,ncol = 1) +
-  # labs(y = "Degrees Celsius") +
-  # facet_grid(rows = vars(name),cols = vars(year),scales = "free") +
-  # geom_vline(xintercept = as.numeric(as.POSIXct("2023-06-16")),
-  #            color = "red") +
-  # geom_vline(xintercept = as.numeric(as.POSIXct("2023-06-09")),
-  #            color = "blue") +
+  timeAverage("6 hour") %>% 
+  mutate(PMT_Temp = ifelse(PMT_Temp < -23 & PMT_Temp > -30,PMT_Temp,NA_real_),
+         year = year(date),
+         doy = yday(date)) %>% 
+  filter(doy < 300 & doy > 31) %>% 
+  pivot_longer(c(PMT_Temp,Control_Temp)) %>%
+  ggplot(aes(date,value)) + 
+  geom_path() +
+  labs(x = NULL, y = NULL) +
+  facet_grid(cols = vars(year),rows = vars(name),scales = "free") +
+  scale_x_datetime(breaks = "1 month",date_labels = "%b") +
   scale_colour_viridis_c()
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-ggsave('lab_reaction_vol_pmt_temp.png',
-       path = "output/plots/temp_different_years",
+ggsave('temp_21to23.png',
+       path = "output/plots/nox_overview_plots_oct23",
        width = 30,
        height = 12,
        units = 'cm')
 
+
+dat %>% 
+  # timeAverage("6 hour") %>% 
+  mutate(PMT_Temp = ifelse(PMT_Temp < -23 & PMT_Temp > -30,PMT_Temp,NA_real_),
+         year = year(date),
+         doy = yday(date)) %>% 
+  filter(doy < 300 & doy > 31,
+         CH1_zero > 2500,
+         CH1_zero < 7000) %>% 
+  # pivot_longer(c(PMT_Temp,Control_Temp)) %>%
+  ggplot(aes(CH1_zero,PMT_Temp,col = Control_Temp)) + 
+  geom_point() +
+  labs(x = NULL, y = NULL) +
+  facet_grid(cols = vars(year)) +
+  # scale_x_datetime(breaks = "1 month",date_labels = "%b") +
+  scale_colour_viridis_c()
 
 # Looking at raw counts and temperature -----------------------------------
 
