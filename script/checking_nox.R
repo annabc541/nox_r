@@ -248,6 +248,62 @@ processed_dat %>%
 
 
 
+
+# Checking when PAG problems started --------------------------------------
+
+setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
+
+raw_dat22 = read.csv("output/data/raw_dat22.csv") %>%
+  tibble() %>%
+  mutate(date = ymd_hms(date))
+
+raw_dat22 %>% 
+  mutate(cal = ifelse(NOx_cal == 1 | zero_air_valve == 1, 1, 0)) %>% 
+  filter(
+    # CH1_Hz < 8000,
+    # CH1_Hz > 0,
+    zero_air_valve == 1,
+     date > "2022-03-01" & date < "2022-06-01") %>% 
+  # timeAverage("1 hour") %>% 
+  # pivot_longer(c(Control_Temp,PMT_Temp,Rxn_Vessel_Pressure,CH1_Hz)) %>% 
+  ggplot(aes(date,CH1_Hz,col = zero_air_valve)) +
+  geom_point() +
+  # facet_grid(rows = vars(name),scales = "free") +
+  scale_colour_viridis_c()
+
+setwd('E:/Cape Verde/data/nox_raw_data')
+
+files = list.files(pattern = "z_2204", full.names=TRUE)
+datList = list()
+for(index in 1:length(files)) {
+  
+  datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
+    mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
+    rename(date = TheTime) %>%
+    # timeAverage("5 min") %>% 
+    tibble()
+  
+}
+
+raw_dat2204 = bind_rows(datList) %>%
+  # mutate(date = round_date(date, "1 sec")) %>%
+  remove_empty() %>%
+  remove_constant()
+
+raw_dat2204 %>% 
+  mutate(cal = ifelse(NOx_cal == 1 | zero_air_valve == 1, 1, 0)) %>% 
+  filter(
+    # CH1_Hz < 8000,
+    # CH1_Hz > 0,
+    NOx_cal == 0,
+    date > "2022-04-06 14:30" & date < "2022-04-06 16:00") %>% 
+  # timeAverage("1 hour") %>% 
+  # pivot_longer(c(Control_Temp,PMT_Temp,Rxn_Vessel_Pressure,CH1_Hz)) %>% 
+  ggplot(aes(date,CH1_Hz,col = zero_air_valve)) +
+  geom_point() +
+  # facet_grid(rows = vars(name),scales = "free") +
+  scale_colour_viridis_c()
+
 # Checking CE and SENS ----------------------------------------------------
 
 #looking at CE and SENS
