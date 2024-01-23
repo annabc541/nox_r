@@ -6,64 +6,63 @@ library(zoo)
 
 Sys.setenv(TZ = 'UTC')
 
-#for checking NOx data and its parameters
-
-# Read in processed data ------------------------------------------------------------
-
-setwd("~/Cape Verde/nox/processing/data")
-
-processed_dat23 = read.csv("processed_data_2023/NOx_2023_calc_df.csv") %>% 
-  tibble() %>% 
-  rename(date = X) %>% 
-  mutate(date = ymd_hms(date),
-         date = round_date(date, "1 sec")) %>% 
-  remove_empty() %>% 
-  remove_constant() %>%
-  arrange(date) %>% 
-  timeAverage("5 min") %>% 
-  filter(date > "2023-01-01")
-
-processed_dat24 = read.csv("processed_data/NOx_2024_calc_df.csv") %>% 
-  tibble() %>% 
-  rename(date = X) %>% 
-  mutate(date = ymd_hms(date),
-         date = round_date(date, "1 sec")) %>% 
-  remove_empty() %>% 
-  remove_constant() %>%
-  arrange(date) %>% 
-  timeAverage("5 min")
-
-processed_dat = bind_rows(processed_dat23,processed_dat24) %>% 
-  arrange(date)
+#for finding and solving problems with the NOxy instrument
 
 # Reading in raw data -----------------------------------------------------
 
 setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
+#read in raw dataset for 2023
 raw_dat23 = read.csv("output/data/raw_dat23.csv") %>%
   tibble() %>%
   mutate(date = ymd_hms(date))
 
-# #updating 2024 raw data
+#read in 1 second raw cal dataset for 2023
+raw_dat23_1s = read.csv("output/data/raw_dat23_cals_1s.csv") %>%
+  tibble() %>% 
+  mutate(date = ymd_hms(date))
+
+#updating 2024 raw dataset
 setwd('E:/Cape Verde/data/nox_raw_data')
  
-files = list.files(pattern = "z_2401", full.names=TRUE)
+files = list.files(pattern = "z_24", full.names=TRUE)
 datList = list()
 for(index in 1:length(files)) {
 
   datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
     mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
     rename(date = TheTime) %>%
-    # timeAverage("5 min") %>%
+    timeAverage("5 min") %>%
     tibble()
 
 }
 
-raw_dat2401 = bind_rows(datList) %>%
+raw_dat24 = bind_rows(datList) %>%
   mutate(date = round_date(date, "1 sec")) %>%
   remove_empty() %>%
   remove_constant()
+
+
+#creating 1 second raw dataset for looking at cals
+# files = list.files(pattern = "z_23", full.names=TRUE)
+# datList = list()
+# for(index in 1:length(files)) {
 #   
+#   datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
+#     mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
+#     rename(date = TheTime) %>%
+#     filter(NOx_cal == 1 | zero_air_valve == 1) %>% 
+#     tibble()
+#   
+# }
+# 
+# raw_dat23_1s = bind_rows(datList) %>%
+#   mutate(date = round_date(date, "1 sec")) %>%
+#   remove_empty() %>%
+#   remove_constant()
+
+#updating/creating datasets
+   
 # setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 # 
 # initial_raw_dat23 = read.csv("output/data/raw_dat23.csv") %>% 
@@ -77,116 +76,40 @@ raw_dat2401 = bind_rows(datList) %>%
 #   arrange(date) %>% 
 #   filter(date > "2023-01-01" & date < "2024-01-01")
 
-# write.csv(raw_dat23,"output/data/raw_dat23.csv",row.names =  FALSE)
+# write.csv(raw_dat23_1s,"output/data/raw_dat23_cals_1s.csv",row.names =  FALSE)
 
+# Read in processed data ------------------------------------------------------------
+
+setwd("~/Cape Verde/nox/processing/data")
+
+processed_dat23 = read.csv("processed_data_new_jan24/NOx_2023_calc_df.csv") %>% 
+  tibble() %>% 
+  rename(date = X) %>% 
+  mutate(date = ymd_hms(date),
+         date = round_date(date, "1 sec")) %>% 
+  remove_empty() %>% 
+  remove_constant() %>%
+  arrange(date) %>% 
+  timeAverage("5 min") %>% 
+  filter(date > "2023-01-01")
+
+processed_dat24 = read.csv("processed_data_new_jan24/NOx_2024_calc_df.csv") %>% 
+  tibble() %>% 
+  rename(date = X) %>% 
+  mutate(date = ymd_hms(date),
+         date = round_date(date, "1 sec")) %>% 
+  remove_empty() %>% 
+  remove_constant() %>%
+  arrange(date) %>% 
+  timeAverage("5 min") %>% 
+  filter(date > "2024-01-01")
+
+processed_dat = bind_rows(processed_dat23,processed_dat24) %>% 
+  arrange(date)
+
+#creating df with processed and raw data
 # all_dat = left_join(processed_dat,raw_dat23,by = "date")
-
 # write.csv(all_dat23_pmt,"output/processed_and_raw_data.csv",row.names =  FALSE)
-
-# Checking noxy parameters after pump tip seals were changed --------------
-
-raw_dat2311 %>%
-  # timeAverage("1 hour") %>%
-  filter(
-    # date > "2023-09-20",
-    NOx_cal == 0,
-    CH1_Hz > 0,
-    # CH1_Hz < 5000,
-    CH1_zero > 0) %>% 
-  pivot_longer(c(Control_Temp,PMT_Temp,CH1_Hz,CH1_zero)) %>%
-  ggplot(aes(date,value)) +
-  geom_point() +
-  scale_x_datetime(date_breaks = "1 day",date_labels = "%d/%m") +
-  facet_grid(rows = vars(name),scales = "free") +
-  scale_colour_viridis_c() +
-  NULL
-
-#removed data between 18/09/23 13:30 to 19/09/23 19:00 when pump fan wasn't working
-
-#spikes in zero measurements are associated with calibrations
-all_dat %>%
-  # timeAverage("1 hour") %>% 
-  filter(date > "2023-10-07",
-         NOx_cal == 0,
-         CH1_Hz > 0,
-         CH1_zero > 0) %>%
-  pivot_longer(c(CH1_zero,CH1_Hz,NO_Conc_art_corrected,NO2_Conc_diode,NO2_Conc_art_corrected)) %>%
-  ggplot(aes(date,value,col = PMT_Temp)) +
-  geom_point() +
-  scale_x_datetime(date_breaks = "4 days",date_labels = "%d/%m") +
-  facet_grid(rows = vars(name),scales = "free") +
-  scale_colour_viridis_c() +
-  NULL
-
-#haven't done this for PAG data because it's in the artefact df and I couldn't be bothered - sorry!
-ggsave('rxn_cell_pressure_vs_no_night_artefact.png',
-       path = "output/plots/artefact",
-       width = 30,
-       height = 12,
-       units = 'cm')
-
-# Plotting for temperature issues summer 2023 -----------------------------
-
-#look at PMT and lab temperatures
-all_dat23_pmt %>% 
-  filter(date > "2023-02-07") %>% 
-  mutate(sensitivity = na.approx(SENS,na.rm = F)) %>% 
-  filter(CH1_zero > 0,
-         CH1_Hz > 0,
-         NOx_cal == 0) %>%
-  pivot_longer(c(CH1_Hz,CH1_zero)) %>% 
-  ggplot(aes(date,value,col = sensitivity)) +
-  geom_point() +
-  facet_grid(rows = vars(name),scales = "free") +
-  scale_colour_viridis_c() +
-  NULL
-
-ggsave('pmt_lab_temp.png',
-       path = "output/plots/temperature_summer23",
-       width = 30,
-       height = 12,
-       units = 'cm')
-
-
-
-# Too much titration! -----------------------------------------------------
-
-raw_dat2312 %>% 
-  filter(NOx_cal == 1,
-         date > "2023-12-02" & date < "2023-12-05") %>% 
-  ggplot(aes(date,CH1_Hz,col = Titration_lamp)) +
-  geom_point()
-
-processed_dat %>% 
-  # filter(date > "2023-09-01") %>%
-  # pivot_longer(c(CE,CE_diode)) %>%
-  ggplot(aes(date,NO_cal_flow_mean)) +
-  geom_point()
-
-files = list.files(pattern = "z_2304", full.names=TRUE)
-datList = list()
-for(index in 1:length(files)) {
-  
-  datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
-    mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
-    rename(date = TheTime) %>%
-    # timeAverage("5 min") %>% 
-    tibble()
-  
-}
-
-raw_dat2304 = bind_rows(datList) %>%
-  # mutate(date = round_date(date, "1 sec")) %>%
-  remove_empty() %>%
-  remove_constant() 
-
-raw_dat2304 %>% 
-  filter(NOx_cal == 1,
-         date < "2023-04-04"
-  ) %>% 
-  ggplot(aes(date,CH1_Hz,col = Titration_lamp)) +
-  geom_point()
-
 
 # PAG problems ------------------------------------------------------------
 
@@ -225,10 +148,10 @@ all_dat %>%
   scale_colour_viridis_c() +
   NULL
 
-processed_dat %>% 
-  filter(date > "2023-11-01") %>% 
+processed_dat23 %>% 
+  filter(date > "2023-09-11" & date < "2023-09-25") %>%
   mutate(NO_Conc_art_corrected = ifelse(NO_Conc_art_corrected < 20,NO_Conc_art_corrected,NA_real_),
-         NO2_Conc_diode = ifelse(NO2_Conc_diode < 100,NO2_Conc_diode,NA_real_)) %>% 
+         NO2_Conc_diode = ifelse(NO2_Conc_diode < 200,NO2_Conc_diode,NA_real_)) %>%
   pivot_longer(c(NO_Conc_art_corrected,NO2_Conc_diode)) %>% 
   ggplot(aes(date,value)) +
   geom_path() +
@@ -239,70 +162,6 @@ ggsave('all_dat_nov23.png',
        width = 30,
        height = 12,
        units = 'cm')
-
-processed_dat %>% 
-  filter(date > "2023-11-01") %>% 
-  pivot_longer(c(CE,CE_diode)) %>% 
-  ggplot(aes(date,SENS,col = name)) +
-  geom_point()
-
-
-
-
-# Checking when PAG problems started --------------------------------------
-
-setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
-
-raw_dat22 = read.csv("output/data/raw_dat22.csv") %>%
-  tibble() %>%
-  mutate(date = ymd_hms(date))
-
-raw_dat22 %>% 
-  mutate(cal = ifelse(NOx_cal == 1 | zero_air_valve == 1, 1, 0)) %>% 
-  filter(
-    # CH1_Hz < 8000,
-    # CH1_Hz > 0,
-    zero_air_valve == 1,
-     date > "2022-03-01" & date < "2022-06-01") %>% 
-  # timeAverage("1 hour") %>% 
-  # pivot_longer(c(Control_Temp,PMT_Temp,Rxn_Vessel_Pressure,CH1_Hz)) %>% 
-  ggplot(aes(date,CH1_Hz,col = zero_air_valve)) +
-  geom_point() +
-  # facet_grid(rows = vars(name),scales = "free") +
-  scale_colour_viridis_c()
-
-setwd('E:/Cape Verde/data/nox_raw_data')
-
-files = list.files(pattern = "z_2204", full.names=TRUE)
-datList = list()
-for(index in 1:length(files)) {
-  
-  datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
-    mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
-    rename(date = TheTime) %>%
-    # timeAverage("5 min") %>% 
-    tibble()
-  
-}
-
-raw_dat2204 = bind_rows(datList) %>%
-  # mutate(date = round_date(date, "1 sec")) %>%
-  remove_empty() %>%
-  remove_constant()
-
-raw_dat2204 %>% 
-  mutate(cal = ifelse(NOx_cal == 1 | zero_air_valve == 1, 1, 0)) %>% 
-  filter(
-    # CH1_Hz < 8000,
-    # CH1_Hz > 0,
-    NOx_cal == 0,
-    date > "2022-04-06 14:30" & date < "2022-04-06 16:00") %>% 
-  # timeAverage("1 hour") %>% 
-  # pivot_longer(c(Control_Temp,PMT_Temp,Rxn_Vessel_Pressure,CH1_Hz)) %>% 
-  ggplot(aes(date,CH1_Hz,col = zero_air_valve)) +
-  geom_point() +
-  # facet_grid(rows = vars(name),scales = "free") +
-  scale_colour_viridis_c()
 
 # Checking CE and SENS ----------------------------------------------------
 
@@ -325,59 +184,18 @@ processed_dat %>%
   theme(legend.position = "top") +
   NULL
 
-# Plotting processed data -------------------------------------------------
+# Checking NO2 diodes PAG -------------------------------------------------
 
-#nox data
-processed_dat %>% 
-  timeAverage("1 hour") %>% 
-  # filter(date > "2023-11-01") %>% 
-  mutate(NO_Conc_art_corrected = ifelse(NO_Conc_art_corrected > 20,NA_real_,NO_Conc_art_corrected),
-         NO2_Conc_diode = ifelse(NO2_Conc_diode >150,NA_real_,NO2_Conc_diode)) %>%
-  rename(NO = NO_Conc_art_corrected,"NO[2]" = NO2_Conc_diode) %>% 
-  pivot_longer(c(NO,"NO[2]")) %>% 
-  ggplot(aes(date,value)) +
-  theme_bw() +
-  geom_path(linewidth = 0.8) +
-  facet_wrap(~name,scales = "free_y",labeller = label_parsed,ncol = 1) +
-  labs(x = "Datetime (UTC)",
-       y = expression(NO[x]~(ppt))) +
-  scale_x_datetime(date_breaks = "1 month",date_labels = "%b")
+raw_dat23_1s %>% 
+  filter(zero_air_valve == 1 & diodes == 1,
+         date > "2023-09-17" & date < "2023-09-19") %>% 
+  ggplot(aes(date,CH1_Hz)) +
+  geom_point()
 
-ggsave('ce_2023.png',
-       path = "output/plots/nox_plots_2023",
-       width = 30,
-       height = 13,
-       units = 'cm')
+processed_dat23 %>% 
+  ggplot(aes(date,NO2_Conc_diode)) +
+  geom_point()
 
-diurnal = processed_dat %>% 
-  mutate(NO_Conc_art_corrected = ifelse(NO_Conc_art_corrected > 20,NA_real_,NO_Conc_art_corrected),
-         NO2_Conc_diode = ifelse(NO2_Conc_diode >150,NA_real_,NO2_Conc_diode)) %>%
-  rename(NO = NO_Conc_art_corrected,NO2 = NO2_Conc_diode) %>%
-  timeVariation(pollutant = c("NO"),type = "month")
+# setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
 
-diurnal_dat = diurnal$data$hour %>% 
-  ungroup() %>% 
-  pivot_wider(names_from = variable,values_from = Mean) %>% 
-  group_by(hour) %>% 
-  summarise(NO = mean(NO,na.rm = T),
-            NO2 = mean(NO2,na.rm = T))
-
-diurnal_dat %>%
-  ggplot(aes(hour,HONO)) +
-  geom_path(size = 0.75,col = "steelblue1") +
-  geom_ribbon(aes(ymin = HONO - hono_err,ymax = HONO + hono_err),alpha = 0.25,fill = "steelblue1") +
-  # facet_grid(rows = vars(variable),scales = "free_y",labeller = label_parsed) +
-  scale_colour_viridis_d() +
-  theme_bw() +
-  labs(x = "Hour of day (UTC)",
-       y = "HONO (ppt)",
-       color = NULL) +
-  scale_x_continuous(breaks = c(0,4,8,12,16,20)) +
-  # ylim(-1,13) +
-  theme(legend.position = "top")
-
-ggsave('ce_sens.png',
-       path = "output/plots/nox_plots_2023",
-       width = 30,
-       height = 13,
-       units = 'cm')
+# write.csv(raw_dat23_1s,"output/data/raw_dat23_cals_1s.csv",row.names =  FALSE)
