@@ -10,7 +10,7 @@ Sys.setenv(TZ = 'UTC')
 
 # Reading in raw data -----------------------------------------------------
 
-setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
+setwd("~/Cape Verde/nox/processing/nox_r")
 
 #read in raw dataset for 2023
 raw_dat23 = read.csv("output/data/raw_dat23.csv") %>%
@@ -25,19 +25,19 @@ raw_dat23_1s = read.csv("output/data/raw_dat23_cals_1s.csv") %>%
 #updating 2024 raw dataset
 setwd('E:/Cape Verde/data/nox_raw_data')
  
-files = list.files(pattern = "z_24", full.names=TRUE)
+files = list.files(pattern = "z_2309", full.names=TRUE)
 datList = list()
 for(index in 1:length(files)) {
 
   datList[[index]] = read.table(files[index],header=TRUE,sep = ",", na.strings= c('NA','missing'))%>%
     mutate(TheTime=waclr::parse_excel_date(TheTime)) %>%
     rename(date = TheTime) %>%
-    timeAverage("5 min") %>%
+    # timeAverage("5 min") %>%
     tibble()
 
 }
 
-raw_dat24 = bind_rows(datList) %>%
+raw_dat2309 = bind_rows(datList) %>%
   mutate(date = round_date(date, "1 sec")) %>%
   remove_empty() %>%
   remove_constant()

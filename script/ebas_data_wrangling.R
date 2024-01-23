@@ -2,7 +2,7 @@ library(tidyverse)
 library(lubridate)
 library(openair)
 
-setwd("~/Cape Verde/nox/ebas_ceda_data")
+setwd("~/Cape Verde/nox/processing/ebas_ceda_data")
 
 # Reading in Simone's data ------------------------------------------------
 
@@ -112,7 +112,7 @@ ebas_no = left_join(ebas_no_2,ebas_no_3,by = "date") %>%
 # Reading NO2 ebas data ---------------------------------------------------
 
 #reading in NO2 data from ebas
-setwd("~/Cape Verde/nox/ebas_ceda_data/ebas_no2")
+setwd("~/Cape Verde/nox/processing/ebas_ceda_data/ebas_no2")
 
 files = list.files(full.names = TRUE,pattern = "_no2")
 skip_values = c(76,76,76,76,78,76)
@@ -199,7 +199,7 @@ dat %>%
   facet_wrap(~year,ncol = 1,scales = "free_x") +
   geom_path()
 
-setwd("~/Cape Verde/nox/processing/initial_processing/nox_r")
+setwd("~/Cape Verde/nox/processing/nox_r")
 
 diurnal = nox23 %>% 
   rename(NO = no_ppt,NO2 = no2_ppt) %>%
@@ -233,8 +233,8 @@ diurnal_dat %>%
   scale_x_continuous(breaks = c(0,4,8,12,16,20)) +
   theme(legend.position = "top")
 
-ggsave("no2_monthly_diurnal_23.png",
-       path = "output/plots/nox_overview_plots_jan24",
+ggsave("hourly_no2_23.png",
+       path = "output/plots/no2_baseline",
        width = 30,
        height = 12,
        units = 'cm')
