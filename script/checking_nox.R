@@ -80,7 +80,7 @@ raw_dat2309 = bind_rows(datList) %>%
 
 # Read in processed data ------------------------------------------------------------
 
-setwd("~/Cape Verde/nox/processing/data")
+setwd("~/Cape Verde/nox/processing/processed_data")
 
 processed_dat23 = read.csv("processed_data_new_jan24/NOx_2023_calc_df.csv") %>% 
   tibble() %>% 
