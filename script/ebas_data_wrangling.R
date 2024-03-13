@@ -1,6 +1,7 @@
 library(tidyverse)
 library(lubridate)
 library(openair)
+library(janitor)
 
 setwd("~/Cape Verde/nox/processing/ebas_ceda_data")
 
@@ -99,14 +100,17 @@ for(index in 1:length(files)) {
 ebas_no_3 = bind_rows(datList) %>% 
   arrange(date) %>% 
   select(date,no_lod = NO,no_lod_ppb = NO.1,
-         no_uncertainty = NO.2,no_uncertainty_ppb = NO.3,no_flag = flag) %>% 
-  rename_with( .fn = function(.x){paste0(.x,"_3")},
+         no_uncertainty = NO.2,no_uncertainty_ppb = NO.3) %>% 
+  rename_with( .fn = function(.x){paste0(.x,"_1")},
                .cols=-date)
 
 ebas_no = left_join(ebas_no_2,ebas_no_3,by = "date") %>% 
   mutate(no_ppb_1 = no_1 / 0.6249228119) %>% 
   bind_rows(ebas_no_1) %>% 
-  arrange(date)
+  filter(no_flag_1 != 0.999) %>%
+  arrange(date) %>% 
+  mutate(no_ppt_ebas = no_ppb_1 * 10^3) %>% 
+  select(date,no_ppt_ebas,no_flag_ebas = no_flag_1)
 
 
 # Reading NO2 ebas data ---------------------------------------------------
@@ -128,10 +132,10 @@ for(index in 1:length(files)) {
 
 ebas_no2 = bind_rows(datList) %>% 
   arrange(date) %>% 
-  select(date,no2 = NO2,no2_ppb = NO2.1,no2_lod = NO2.2,no2_lod_ppb = NO2.3,
-         no2_uncertainty = NO2.4,no2_uncertainty_ppb = NO2.5,no2_flag = flag) %>% 
-  rename_with( .fn = function(.x){paste0(.x,"_1")},
-               .cols=-date)
+  select(date,no2_ppb = NO2.1,no2_flag_ebas = flag) %>% 
+  filter(no2_flag_ebas != 0.999) %>% 
+  mutate(no2_ppt = no2_ppb * 10^3) %>% 
+  select(-no2_ppt)
 
 
 # Reading CEDA data -------------------------------------------------------
@@ -152,8 +156,47 @@ dat %>%
   ggplot(aes(date,no_ppb)) +
     geom_path()
 
+
+# Reading in nox data 2006-2012 -------------------------------------------
+
+nox_raw = read.table("cv-noxy_capeverde_20061001_60min_raw.na",skip = 47) %>% 
+  rename(date = V1,
+         no_ppt_raw = V2,
+         no_error_flag_raw = V3,
+         no2_ppt_raw = V4,
+         no2_error_flag_raw = V5,
+         noy_ppt_raw = V6,
+         noy_error_flag_raw = V7) %>% 
+  mutate(date = as.POSIXct(round(date/0.0417)* 3600,
+                           origin = "2006-01-01 00:00"))
+
+nox_filtered = read.table("cv-noxy_capeverde_20061001_60min_filtered.na",skip = 48) %>% 
+  rename(date = V1,
+         no_ppt_filtered = V2,
+         no_error_flag_filtered = V3,
+         no2_ppt_filtered = V4,
+         no2_error_flag_filtered = V5,
+         noy_ppt_filtered = V6,
+         noy_error_flag_filtered = V7) %>% 
+  mutate(date = as.POSIXct(round(date/0.0417)* 3600,
+                           origin = "2006-01-01 00:00"))
+
+
+
+# Reading in merge data ---------------------------------------------------
+
+setwd("~/Cape Verde")
+
+cv_merge = read.csv("20230827_CV_merge.csv") %>% 
+  mutate(date = ymd_hms(date)) %>% 
+  clean_names() %>% 
+  remove_empty() %>% 
+  select(date,year,no_ppt_merge = no_ppt_v,no2_ppt_merge = no2_ppt_v)
+
+
 # Plotting and comparing data ---------------------------------------------
 
+#ebas/ceda data and simone's data
 df_list = list(simone_dat,ebas_no,ebas_no2)
 dat = df_list %>% reduce(full_join,by = "date") %>% 
   arrange(date)
@@ -169,7 +212,29 @@ dat %>%
   facet_grid(rows = vars(name),scales = "free") +
   NULL
 
-  
+# Making nox dataframe and checking everything ----------------------------
+
+df_list = list(cv_merge,nox_raw,nox_filtered,ebas_no,ebas_no2)
+dat = df_list %>% reduce(full_join,by = "date")
+
+dat %>% 
+  mutate(no_ppt_raw = case_when(no_error_flag_raw == 3 ~ NA_real_,
+                                # no_error_flag_raw == 2 ~ NA_real_,
+                                no_ppt_raw > 50 ~ NA_real_,
+                                TRUE ~ no_ppt_raw),
+         no_ppt_filtered = ifelse(no_error_flag_filtered == 3,NA_real_,no_ppt_filtered),
+         diff_raw = abs(no_ppt_raw-no_ppt_merge),
+         diff = abs(no_ppt_raw-no_ppt_filtered),
+         diff_filtered = no_ppt_filtered-no_ppt_merge) %>% 
+  pivot_longer(c(no_ppt_filtered,no_ppt_raw,no_ppt_merge)) %>% 
+  filter(year == 2011,
+         value > 0
+         ) %>%
+  ggplot(aes(date,value)) +
+  geom_point() +
+  facet_grid(rows = vars(name)) +
+  NULL
+
 
 # Reading in 2022 and 2023 data -------------------------------------------
 
