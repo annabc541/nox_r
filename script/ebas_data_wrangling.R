@@ -104,14 +104,13 @@ ebas_no_3 = bind_rows(datList) %>%
   rename_with( .fn = function(.x){paste0(.x,"_1")},
                .cols=-date)
 
-ebas_no = left_join(ebas_no_2,ebas_no_3,by = "date") %>% 
+ebas_no = left_join(ebas_no_2,ebas_no_3,by = "date") %>%
   mutate(no_ppb_1 = no_1 / 0.6249228119) %>% 
   bind_rows(ebas_no_1) %>% 
   filter(no_flag_1 != 0.999) %>%
   arrange(date) %>% 
   mutate(no_ppt_ebas = no_ppb_1 * 10^3) %>% 
   select(date,no_ppt_ebas,no_flag_ebas = no_flag_1)
-
 
 # Reading NO2 ebas data ---------------------------------------------------
 
@@ -132,13 +131,13 @@ for(index in 1:length(files)) {
 
 ebas_no2 = bind_rows(datList) %>% 
   arrange(date) %>% 
-  select(date,no2_ppb = NO2.1,no2_flag_ebas = flag) %>% 
-  filter(no2_flag_ebas != 0.999) %>% 
-  mutate(no2_ppt = no2_ppb * 10^3) %>% 
-  select(-no2_ppt)
-
+  select(date,no2_ppb_ebas = NO2.1,no2_flag_ebas = flag) %>% 
+  mutate(no2_ppt_ebas = no2_ppb_ebas * 10^3) %>% 
+  select(date,no2_ppt_ebas,no2_flag_ebas)
 
 # Reading CEDA data -------------------------------------------------------
+
+setwd("~/Cape Verde/nox/processing/ebas_ceda_data")
 
 no_ceda = read.table("ceda_no16.txt",skip = 44) %>% 
   mutate(date = as.POSIXct(round(V1 / 0.0417) *3600,origin = "2006-01-01")) %>% 
@@ -156,8 +155,9 @@ dat %>%
   ggplot(aes(date,no_ppb)) +
     geom_path()
 
-
 # Reading in nox data 2006-2012 -------------------------------------------
+
+setwd("~/Cape Verde/nox/processing/ebas_ceda_data")
 
 nox_raw = read.table("cv-noxy_capeverde_20061001_60min_raw.na",skip = 47) %>% 
   rename(date = V1,
@@ -181,8 +181,6 @@ nox_filtered = read.table("cv-noxy_capeverde_20061001_60min_filtered.na",skip = 
   mutate(date = as.POSIXct(round(date/0.0417)* 3600,
                            origin = "2006-01-01 00:00"))
 
-
-
 # Reading in merge data ---------------------------------------------------
 
 setwd("~/Cape Verde")
@@ -193,7 +191,6 @@ cv_merge = read.csv("20230827_CV_merge.csv") %>%
   remove_empty() %>% 
   select(date,year,no_ppt_merge = no_ppt_v,no2_ppt_merge = no2_ppt_v)
 
-
 # Plotting and comparing data ---------------------------------------------
 
 #ebas/ceda data and simone's data
@@ -202,39 +199,34 @@ dat = df_list %>% reduce(full_join,by = "date") %>%
   arrange(date)
 
 dat %>% 
-  mutate(no2_ppb = ifelse(no2_flag > 0.149, NA_real_,no2_ppb * 1000),
-         no2_ppb_1 = ifelse(no2_flag_1 > 0.149,NA_real_,no2_ppb_1 * 1000),
-         diff = abs(no2_ppb - no2_ppb_1)) %>%
-  pivot_longer(c(no2_ppb,no2_ppb_1,diff)) %>% 
-  filter(date > "2017-01-01" & date < "2022-01-01") %>%
-  ggplot(aes(date,value,col = name)) +
+  mutate(no_ppt_simone = ifelse(no_flag > 0.149, NA_real_,no_ppb * 1000),
+         no_ppt_ebas = ifelse(no_flag_ebas > 0.149,NA_real_,no_ppt_ebas),
+         diff = abs(no_ppt_simone - no_ppt_ebas)) %>%
+  # pivot_longer(c(no_ppt_simone,no_ppt_ebas)) %>% 
+  filter(date > "2014-01-01" & date < "2022-01-01") %>%
+  ggplot(aes(no_ppt_ebas,no_ppt_simone)) +
   geom_point() +
-  facet_grid(rows = vars(name),scales = "free") +
   NULL
 
 # Making nox dataframe and checking everything ----------------------------
 
-df_list = list(cv_merge,nox_raw,nox_filtered,ebas_no,ebas_no2)
+df_list = list(cv_merge,nox_raw,nox_filtered,ebas_no,ebas_no2,simone_dat)
 dat = df_list %>% reduce(full_join,by = "date")
 
 dat %>% 
-  mutate(no_ppt_raw = case_when(no_error_flag_raw == 3 ~ NA_real_,
-                                # no_error_flag_raw == 2 ~ NA_real_,
-                                no_ppt_raw > 50 ~ NA_real_,
-                                TRUE ~ no_ppt_raw),
-         no_ppt_filtered = ifelse(no_error_flag_filtered == 3,NA_real_,no_ppt_filtered),
-         diff_raw = abs(no_ppt_raw-no_ppt_merge),
-         diff = abs(no_ppt_raw-no_ppt_filtered),
-         diff_filtered = no_ppt_filtered-no_ppt_merge) %>% 
-  pivot_longer(c(no_ppt_filtered,no_ppt_raw,no_ppt_merge)) %>% 
-  filter(year == 2011,
-         value > 0
-         ) %>%
-  ggplot(aes(date,value)) +
+  mutate(no_ppt_filtered = case_when(no_error_flag_filtered > 2 ~ NA_real_,
+                                     TRUE ~ no_ppt_filtered),
+         no_ppt_ebas = case_when(no_flag_ebas > 0.149 ~ NA_real_,
+                                 TRUE ~ no_ppt_ebas),
+         no_ppt_simone = case_when(no_flag > 0.149 ~ NA_real_,
+                                   TRUE ~ no_ppb *10^3)) %>% 
+  pivot_longer(c(no_ppt_ebas,no_ppt_simone,no_ppt_merge)) %>%
+  filter(date > "2014-01-01" & date < "2022-01-01",
+         value < 500) %>%
+  ggplot(aes(date,value,col = name)) +
   geom_point() +
   facet_grid(rows = vars(name)) +
   NULL
-
 
 # Reading in 2022 and 2023 data -------------------------------------------
 
