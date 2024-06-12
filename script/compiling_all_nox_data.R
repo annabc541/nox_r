@@ -3,7 +3,7 @@ library(lubridate)
 library(openair)
 library(janitor)
 
-setwd("~/Cape Verde/nox/processing/ebas_ceda_data")
+setwd("~/Cape Verde/nox/data_submission/downloaded_data")
 
 # Reading in NO ebas data -------------------------------------------------
 
